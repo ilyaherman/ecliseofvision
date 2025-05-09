@@ -1,0 +1,16 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #111;
+}
+
+canvas {
+    display: block;
+    background-color: #000;
+    border: 2px solid #fff;
+    margin: 0 auto;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
