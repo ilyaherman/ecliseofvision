@@ -1,7 +1,8 @@
+// level1.js
 const blocks = [];
 let waveOffset = 0;
 const rainDrops = [];
-let waterLevel = 100; // Depth from canvas bottom
+let waterLevel = 100;
 let waterRiseSpeed = 0.2;
 let fallingPlatform = null;
 let warningIcon = null;
@@ -17,11 +18,12 @@ let cameraOffsetY = 0;
 function generatePlatforms(screen = 1) {
   blocks.length = 0;
 
-  const minY = 100 - (screen - 1) * canvas.height;
-  const maxY = canvas.height - 120 - (screen - 1) * canvas.height;
-  const verticalStep = Math.floor((maxY - minY) / platformCount);
+  // Adjust minY and maxY to stay within the current screen
+  const minY = canvas.height - 120; // Top of the screen
+  const maxY = 100; // Bottom of the screen
+  const verticalStep = Math.floor((minY - maxY) / platformCount);
 
-  const startPlatformY = canvas.height - 195 - (screen - 1) * canvas.height;
+  const startPlatformY = canvas.height - 195;
   blocks.push({ 
     x: 100,
     y: startPlatformY,
@@ -34,7 +36,7 @@ function generatePlatforms(screen = 1) {
   player.grounded = true;
 
   for (let i = 0; i < platformCount; i++) {
-    const y = maxY - i * verticalStep;
+    const y = minY - i * verticalStep;
     const x = Math.random() * (canvas.width - blockWidth);
     blocks.push({ 
       x, 
@@ -42,34 +44,41 @@ function generatePlatforms(screen = 1) {
       width: blockWidth
     });
   }
+
+  console.log(`Generated platforms for screen ${screen}:`, blocks);
 }
 
 function createFallingPlatform(x) {
   fallingPlatform = {
     x: x,
-    y: 0 - cameraOffsetY,
+    y: 0,
     width: blockWidth,
     height: blockHeight,
     fallSpeed: 10
   };
+  console.log("Created falling platform:", fallingPlatform);
 }
 
 function createRedFallingPlatform() {
   redFallingPlatforms.push({
     x: Math.random() * (canvas.width - blockWidth),
-    y: 0 - cameraOffsetY,
+    y: 0,
     width: blockWidth,
     height: blockHeight,
     fallSpeed: 8
   });
+  console.log("Created red falling platform:", redFallingPlatforms[redFallingPlatforms.length - 1]);
 }
 
 function createWarningIcon() {
   const availablePlatforms = blocks
     .map((block, index) => ({ block, index }))
-    .filter(({ block, index }) => index > 0 && block.y + blockHeight <= canvas.height - waterLevel - cameraOffsetY);
+    .filter(({ block, index }) => index > 0 && block.y + blockHeight <= canvas.height - waterLevel);
 
-  if (availablePlatforms.length === 0) return;
+  if (availablePlatforms.length === 0) {
+    console.log("No available platforms for warning icon");
+    return;
+  }
 
   const { block: platform } = availablePlatforms[Math.floor(Math.random() * availablePlatforms.length)];
   
@@ -79,6 +88,7 @@ function createWarningIcon() {
     width: 40,
     height: 40
   };
+  console.log("Created warning icon:", warningIcon);
 }
 
 function checkFallingPlatformCollision() {
@@ -93,6 +103,7 @@ function checkFallingPlatformCollision() {
       if (player.health < 0) player.health = 0;
       if (player.health === 0) gameState.gameOver = true;
       fallingPlatform = null;
+      console.log("Player hit by falling platform, health:", player.health);
     }
   }
 
@@ -108,6 +119,7 @@ function checkFallingPlatformCollision() {
       if (player.health < 0) player.health = 0;
       if (player.health === 0) gameState.gameOver = true;
       redFallingPlatforms.splice(i, 1);
+      console.log("Player hit by red platform, health:", player.health);
     }
   }
 }
@@ -126,14 +138,16 @@ function checkWarningIconCollision() {
     player.isWaterSlowed = true;
     player.slowWaterTimer = 0;
     waterRiseSpeed = 0.05;
+    console.log("Player collected warning icon, water rise slowed");
   }
 }
 
 function checkWaterCollision() {
-  const waterTop = canvas.height - waterLevel; // Water's top in canvas coordinates
-  const playerBottom = player.y + player.height + cameraOffsetY; // Player's bottom in canvas coordinates
+  const waterTop = canvas.height - waterLevel;
+  const playerBottom = player.y + player.height;
   if (playerBottom >= waterTop) {
     gameState.gameOver = true;
+    console.log("Player drowned, game over");
   }
 }
 
@@ -155,7 +169,7 @@ function updateFallingPlatform() {
 
   if (fallingPlatform) {
     fallingPlatform.y += fallingPlatform.fallSpeed;
-    if (fallingPlatform.y + fallingPlatform.height > canvas.height - waterLevel - cameraOffsetY) {
+    if (fallingPlatform.y + fallingPlatform.height > canvas.height - waterLevel) {
       fallingPlatform = null;
     }
   }
@@ -163,9 +177,14 @@ function updateFallingPlatform() {
   for (let i = redFallingPlatforms.length - 1; i >= 0; i--) {
     const platform = redFallingPlatforms[i];
     platform.y += platform.fallSpeed;
-    if (platform.y + fallingPlatform.height > canvas.height - waterLevel - cameraOffsetY) {
+    if (platform.y + platform.height > canvas.height - waterLevel) {
       redFallingPlatforms.splice(i, 1);
     }
+  }
+
+  if (redPlatformTimer >= redPlatformSpawnInterval) {
+    createRedFallingPlatform();
+    redPlatformTimer = 0;
   }
 }
 
@@ -173,18 +192,18 @@ function drawBlocks() {
   ctx.fillStyle = "#ccc";
   blocks.forEach(block => {
     const blockW = block.width || blockWidth;
-    ctx.fillRect(block.x, block.y + cameraOffsetY, blockW, blockHeight);
+    ctx.fillRect(block.x, block.y, blockW, blockHeight);
     ctx.strokeStyle = "#999";
-    ctx.strokeRect(block.x, block.y + cameraOffsetY, blockW, blockHeight);
+    ctx.strokeRect(block.x, block.y, blockW, blockHeight);
   });
 
   if (fallingPlatform) {
     ctx.save();
     ctx.filter = 'blur(5px)';
     ctx.fillStyle = "rgba(255, 0, 0, 0.7)";
-    ctx.fillRect(fallingPlatform.x, fallingPlatform.y + cameraOffsetY, fallingPlatform.width, fallingPlatform.height);
+    ctx.fillRect(fallingPlatform.x, fallingPlatform.y, fallingPlatform.width, fallingPlatform.height);
     ctx.strokeStyle = "#999";
-    ctx.strokeRect(fallingPlatform.x, fallingPlatform.y + cameraOffsetY, fallingPlatform.width, fallingPlatform.height);
+    ctx.strokeRect(fallingPlatform.x, fallingPlatform.y, fallingPlatform.width, fallingPlatform.height);
     ctx.restore();
   }
 
@@ -192,25 +211,26 @@ function drawBlocks() {
     ctx.save();
     ctx.filter = 'blur(5px)';
     ctx.fillStyle = "rgba(255, 0, 0, 0.7)";
-    ctx.fillRect(platform.x, platform.y + cameraOffsetY, platform.width, platform.height);
+    ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
     ctx.strokeStyle = "#999";
-    ctx.strokeRect(platform.x, platform.y + cameraOffsetY, platform.width, platform.height);
+    ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
     ctx.restore();
   });
 
   if (warningIcon) {
     if (warningIconImage.complete && warningIconImage.naturalWidth !== 0) {
-      ctx.drawImage(warningIconImage, warningIcon.x, warningIcon.y + cameraOffsetY, warningIcon.width, warningIcon.height);
+      ctx.drawImage(warningIconImage, warningIcon.x, warningIcon.y, warningIcon.width, warningIcon.height);
     } else {
       ctx.fillStyle = "yellow";
       ctx.beginPath();
-      ctx.moveTo(warningIcon.x + warningIcon.width / 2, warningIcon.y + cameraOffsetY);
-      ctx.lineTo(warningIcon.x, warningIcon.y + warningIcon.height + cameraOffsetY);
-      ctx.lineTo(warningIcon.x + warningIcon.width, warningIcon.y + warningIcon.height + cameraOffsetY);
+      ctx.moveTo(warningIcon.x + warningIcon.width / 2, warningIcon.y);
+      ctx.lineTo(warningIcon.x, warningIcon.y + warningIcon.height);
+      ctx.lineTo(warningIcon.x + warningIcon.width, warningIcon.y + warningIcon.height);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = "#000";
       ctx.stroke();
+      console.warn("Warning icon image not loaded, using fallback");
     }
   }
 }
@@ -250,11 +270,12 @@ function createRain() {
   while (rainDrops.length < rainCount) {
     rainDrops.push({
       x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height - cameraOffsetY,
+      y: Math.random() * canvas.height,
       length: 10 + Math.random() * 10,
       speed: 4 + Math.random() * 4
     });
   }
+  console.log("Created rain drops:", rainDrops.length);
 }
 
 function updateRain() {
@@ -263,8 +284,8 @@ function updateRain() {
       const drop = rainDrops[i];
       drop.y += drop.speed;
 
-      if (drop.y >= canvas.height - waterLevel - cameraOffsetY) {
-        drop.y = -drop.length - cameraOffsetY;
+      if (drop.y >= canvas.height - waterLevel) {
+        drop.y = -drop.length;
         drop.x = Math.random() * canvas.width;
       }
     }
@@ -277,8 +298,8 @@ function drawRain() {
   for (let i = 0; i < rainDrops.length; i++) {
     const drop = rainDrops[i];
     ctx.beginPath();
-    ctx.moveTo(drop.x, drop.y + cameraOffsetY);
-    ctx.lineTo(drop.x, drop.y + drop.length + cameraOffsetY);
+    ctx.moveTo(drop.x, drop.y);
+    ctx.lineTo(drop.x, drop.y + drop.length);
     ctx.stroke();
   }
 }
@@ -294,19 +315,26 @@ function drawGameOver() {
   ctx.font = "20px Arial";
   ctx.fillText("Чтобы продолжить, нажмите на R", canvas.width / 2, canvas.height / 2 + 20);
 
-  // Stop rain sound
   soundManager.stop('rain');
 }
 
 function transitionToNextScreen() {
-  currentScreen = 2;
-  cameraOffsetY = canvas.height;
-  player.y += canvas.height;
-  waveOffset = 0;
-  rainDrops.length = 0;
-  createRain();
-  generatePlatforms(currentScreen);
-  // Rain sound continues on second screen (no stop call)
+  if (currentScreen < gameState.totalScreens) {
+    currentScreen++;
+    cameraOffsetY = 0; // Reset camera for simplicity
+    player.y = canvas.height - 195 - player.height; // Reposition player
+    player.x = 100 + (blockWidth + 60) / 2 - player.width / 2;
+    waterLevel = 100;
+    waveOffset = 0;
+    rainDrops.length = 0;
+    createRain();
+    generatePlatforms(currentScreen);
+    console.log(`Transitioned to screen ${currentScreen}, player at:`, { x: player.x, y: player.y });
+  } else {
+    gameState.gameOver = true;
+    gameState.victory = true;
+    console.log("Victory achieved!");
+  }
 }
 
 function resetGame() {
@@ -335,6 +363,7 @@ function resetGame() {
 
   currentScreen = 1;
   cameraOffsetY = 0;
+  gameState.victory = false;
 
   generatePlatforms(currentScreen);
 
@@ -344,21 +373,25 @@ function resetGame() {
     cancelAnimationFrame(gameState.animationFrameId);
   }
 
-  // Play rain sound on reset (first screen)
   soundManager.play('rain');
 
   gameLoop();
 }
 
 function gameLoop() {
+  if (gameState.paused) return;
+
   ctx.fillStyle = "#555";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const scale = canvas.width / backgroundImage.width;
-  const scaledHeight = backgroundImage.height * scale;
-  const yOffset = (canvas.height - scaledHeight) / 2 + cameraOffsetY;
-
-  ctx.drawImage(backgroundImage, 0, yOffset, canvas.width, scaledHeight);
+  if (backgroundImage.complete && backgroundImage.naturalWidth !== 0) {
+    const scale = canvas.width / backgroundImage.width;
+    const scaledHeight = backgroundImage.height * scale;
+    const yOffset = (canvas.height - scaledHeight) / 2;
+    ctx.drawImage(backgroundImage, 0, yOffset, canvas.width, scaledHeight);
+  } else {
+    console.warn("Background image not loaded, skipping draw");
+  }
 
   drawBlocks();
   drawWater();
@@ -369,17 +402,25 @@ function gameLoop() {
   drawPlayer();
   drawHealthBar();
   checkWaterCollision();
+  checkFallingPlatformCollision();
+  checkWarningIconCollision();
 
-  if (player.y < 0 && currentScreen === 1) {
+  if (player.y < 0 && currentScreen < gameState.totalScreens) {
     transitionToNextScreen();
   }
 
   if (gameState.gameOver) {
-    drawGameOver();
+    if (gameState.victory) {
+      drawVictoryScreen();
+    } else {
+      drawGameOver();
+    }
     cancelAnimationFrame(gameState.animationFrameId);
   } else {
     gameState.animationFrameId = requestAnimationFrame(gameLoop);
   }
+
+  console.log(`Game loop running, screen: ${currentScreen}, player:`, { x: player.x, y: player.y });
 }
 
 function initGame() {
@@ -390,13 +431,12 @@ function initGame() {
   
   generatePlatforms(currentScreen);
   createRain();
-  // Play rain sound on first screen
   soundManager.play('rain');
   gameLoop();
 }
 
 window.addEventListener("keydown", function(e) {
-  if (gameState.gameOver && e.key.toLowerCase() === "r") {
+  if ((gameState.gameOver || gameState.victory) && e.key.toLowerCase() === "r") {
     resetGame();
     return;
   }
